@@ -1,62 +1,97 @@
 import streamlit as st
 import requests
 
-# ВСТАВЬ СВОЙ КЛЮЧ СЮДА (между кавычек)
+# Твой ключ вшит навсегда
 STEAM_API_KEY = "F0470B6F6D6AFBC9787C40C7507C6B58"
 
-st.set_page_config(page_title="CS2 Steam Analytics", page_icon="🎮", layout="wide")
+st.set_page_config(page_title="ANTer404 CS2 Stats", page_icon="📊", layout="wide")
 
+# Проверка сессии
 if "steam_user" not in st.session_state:
     st.session_state["steam_user"] = None
 
-def get_steam_user(profile_url):
-    # Упрощенная логика: вытягиваем ID из ссылки
-    # Ссылка может быть https://steamcommunity.com/id/nickname/ или /profiles/number
+def get_steam_data(profile_url):
     try:
+        # 1. Получаем SteamID из ссылки
         if "profiles" in profile_url:
-            steam_id = profile_url.strip("/").split("/")[-1]
+            sid = profile_url.strip("/").split("/")[-1]
         else:
-            vanity_url = profile_url.strip("/").split("/")[-1]
-            res = requests.get(f"http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key={STEAM_API_KEY}&vanityurl={vanity_url}")
-            steam_id = res.json()['response']['steamid']
+            v_url = profile_url.strip("/").split("/")[-1]
+            res = requests.get(f"http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key={STEAM_API_KEY}&vanityurl={v_url}").json()
+            sid = res['response']['steamid']
         
-        # Получаем инфу о юзере
-        user_res = requests.get(f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}")
-        return user_res.json()['response']['players'][0]
-    except:
-        return None
+        # 2. Инфо о профиле (Аватар, Ник)
+        user = requests.get(f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={sid}").json()['response']['players'][0]
+        
+        # 3. Инфо об играх (Ищем CS2 - AppID 730)
+        games_url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={STEAM_API_KEY}&steamid={sid}&format=json&include_appinfo=1"
+        games = requests.get(games_url).json()
+        
+        cs2_info = None
+        if 'games' in games['response']:
+            cs2_info = next((g for g in games['response']['games'] if g['appid'] == 730), None)
+            
+        return user, cs2_info
+    except Exception as e:
+        return None, None
 
+# --- ИНТЕРФЕЙС ---
 if not st.session_state["steam_user"]:
-    st.title("🛡️ Вход через Steam")
-    st.write("Вставь ссылку на свой профиль Steam, чтобы подтянуть реальную статистику")
+    st.title("🎮 Вход в ANTer404 Analytics")
+    st.subheader("Авторизация через Steam")
     
-    url = st.text_input("Ссылка на профиль", placeholder="https://steamcommunity.com/id/your_nick/")
-    if st.button("Войти и синхронизировать"):
+    url = st.text_input("Вставь ссылку на профиль Steam:", placeholder="https://steamcommunity.com/id/your_nick/")
+    
+    if st.button("Синхронизировать данные", use_container_width=True):
         with st.spinner("Связываемся со Steam..."):
-            user_data = get_steam_user(url)
-            if user_data:
-                st.session_state["steam_user"] = user_data
+            u, g = get_steam_data(url)
+            if u:
+                st.session_state["steam_user"] = u
+                st.session_state["cs2_data"] = g
                 st.rerun()
             else:
-                st.error("Не удалось найти профиль. Проверь ссылку или ключ API!")
+                st.error("Ошибка! Проверь ссылку или настройки приватности профиля.")
 else:
-    # --- ЛИЧНЫЙ КАБИНЕТ ---
-    user = st.session_state["steam_user"]
+    u = st.session_state["steam_user"]
+    g = st.session_state["cs2_data"]
     
-    st.sidebar.image(user['avatarfull'], width=150)
-    st.sidebar.title(user['personaname'])
-    if st.sidebar.button("Выйти"):
+    # Боковая панель
+    st.sidebar.image(u['avatarfull'], width=200)
+    st.sidebar.title(u['personaname'])
+    st.sidebar.write(f"ID: `{u['steamid']}`")
+    
+    if st.sidebar.button("Выйти из системы"):
         st.session_state["steam_user"] = None
         st.rerun()
 
-    st.title(f"📊 Аналитика игрока {user['personaname']}")
+    # Основной экран
+    st.title(f"🚀 Дашборд игрока: {u['personaname']}")
     
     col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Карточка профиля")
-        st.write(f"**SteamID:** {user['steamid']}")
-        st.write(f"**Статус:** {'В сети' if user['personastate'] == 1 else 'Оффлайн'}")
-        st.write(f"**Ссылка:** [Открыть профиль]({user['profileurl']})")
     
+    with col1:
+        st.info("📊 Статистика аккаунта")
+        st.write(f"**Страна:** {u.get('loccountrycode', 'Скрыто')}")
+        st.write(f"**Профиль:** [Открыть в Steam]({u['profileurl']})")
+        if 'timecreated' in u:
+            import datetime
+            date = datetime.datetime.fromtimestamp(u['timecreated']).year
+            st.write(f"**Аккаунт создан:** {date} г.")
+
     with col2:
-        st.info("Тут теперь будут твои реальные часы из CS2 (нужно добавить метод GetUserStats)")
+        st.success("🔫 Данные Counter-Strike 2")
+        if g:
+            hours = round(g['playtime_forever'] / 60, 1)
+            st.metric("Общее время в игре", f"{hours} ч.")
+            
+            if 'playtime_2weeks' in g:
+                two_weeks = round(g['playtime_2weeks'] / 60, 1)
+                st.write(f"🔥 Активность за 14 дней: **{two_weeks} ч.**")
+            else:
+                st.write("Последние 2 недели не играл.")
+        else:
+            st.warning("⚠️ Не удалось получить время игры. Сделай 'Игровую информацию' открытой в настройках Steam.")
+
+    st.divider()
+    st.subheader("📈 Твои достижения")
+    st.write("Скоро здесь будет детальный разбор твоих медалей и ачивок!")
