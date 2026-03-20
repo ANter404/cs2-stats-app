@@ -1,61 +1,62 @@
 import streamlit as st
-import pandas as pd
+import requests
 
-st.set_page_config(page_title="ANTer404 Personal Stats", page_icon="📈")
+# ВСТАВЬ СВОЙ КЛЮЧ СЮДА (между кавычек)
+STEAM_API_KEY = "F0470B6F6D6AFBC9787C40C7507C6B58"
 
-# Создаем список для хранения истории матчей, если его нет
-if "match_history" not in st.session_state:
-    st.session_state["match_history"] = []
+st.set_page_config(page_title="CS2 Steam Analytics", page_icon="🎮", layout="wide")
 
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
+if "steam_user" not in st.session_state:
+    st.session_state["steam_user"] = None
 
-if not st.session_state["logged_in"]:
-    st.title("🛡️ CS2 Personal Tracker v3.2")
-    nick = st.text_input("Введи свой ник для входа")
-    if st.button("Войти в систему"):
-        if nick:
-            st.session_state["logged_in"] = True
-            st.session_state["user"] = nick
-            st.rerun()
-else:
-    st.sidebar.title(f"👤 {st.session_state['user']}")
-    menu = st.sidebar.radio("Меню", ["📊 Мой Прогресс", "📝 Записать матч"])
+def get_steam_user(profile_url):
+    # Упрощенная логика: вытягиваем ID из ссылки
+    # Ссылка может быть https://steamcommunity.com/id/nickname/ или /profiles/number
+    try:
+        if "profiles" in profile_url:
+            steam_id = profile_url.strip("/").split("/")[-1]
+        else:
+            vanity_url = profile_url.strip("/").split("/")[-1]
+            res = requests.get(f"http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key={STEAM_API_KEY}&vanityurl={vanity_url}")
+            steam_id = res.json()['response']['steamid']
+        
+        # Получаем инфу о юзере
+        user_res = requests.get(f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}")
+        return user_res.json()['response']['players'][0]
+    except:
+        return None
+
+if not st.session_state["steam_user"]:
+    st.title("🛡️ Вход через Steam")
+    st.write("Вставь ссылку на свой профиль Steam, чтобы подтянуть реальную статистику")
     
-    if st.sidebar.button("Выход"):
-        st.session_state["logged_in"] = False
+    url = st.text_input("Ссылка на профиль", placeholder="https://steamcommunity.com/id/your_nick/")
+    if st.button("Войти и синхронизировать"):
+        with st.spinner("Связываемся со Steam..."):
+            user_data = get_steam_user(url)
+            if user_data:
+                st.session_state["steam_user"] = user_data
+                st.rerun()
+            else:
+                st.error("Не удалось найти профиль. Проверь ссылку или ключ API!")
+else:
+    # --- ЛИЧНЫЙ КАБИНЕТ ---
+    user = st.session_state["steam_user"]
+    
+    st.sidebar.image(user['avatarfull'], width=150)
+    st.sidebar.title(user['personaname'])
+    if st.sidebar.button("Выйти"):
+        st.session_state["steam_user"] = None
         st.rerun()
 
-    if menu == "📊 Мой Прогресс":
-        st.header(f"Аналитика игрока {st.session_state['user']}")
-        
-        if not st.session_state["match_history"]:
-            st.warning("История пуста. Запиши свой первый матч в меню слева!")
-        else:
-            df = pd.DataFrame(st.session_state["match_history"])
-            
-            # Считаем средний K/D
-            avg_kd = round(df["K/D"].mean(), 2)
-            st.metric("Твой средний K/D", avg_kd, delta=None)
-            
-            # График прогресса
-            st.subheader("График K/D по матчам")
-            st.line_chart(df["K/D"])
-            
-            # Таблица матчей
-            st.subheader("Последние игры")
-            st.table(df)
-
-    elif menu == "📝 Записать матч":
-        st.header("Ввод данных после катки")
-        with st.form("add_match"):
-            m_map = st.selectbox("Карта", ["Mirage", "Dust 2", "Inferno", "Anubis", "Ancient"])
-            k = st.number_input("Киллы", 0, 100, 20)
-            d = st.number_input("Смерти", 1, 100, 15)
-            win = st.checkbox("Победа?")
-            
-            if st.form_submit_button("Сохранить игру"):
-                kd = round(k/d, 2)
-                new_match = {"Карта": m_map, "K/D": kd, "Результат": "Win" if win else "Loss"}
-                st.session_state["match_history"].append(new_match)
-                st.success(f"Матч на {m_map} сохранен! K/D: {kd}")
+    st.title(f"📊 Аналитика игрока {user['personaname']}")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Карточка профиля")
+        st.write(f"**SteamID:** {user['steamid']}")
+        st.write(f"**Статус:** {'В сети' if user['personastate'] == 1 else 'Оффлайн'}")
+        st.write(f"**Ссылка:** [Открыть профиль]({user['profileurl']})")
+    
+    with col2:
+        st.info("Тут теперь будут твои реальные часы из CS2 (нужно добавить метод GetUserStats)")
