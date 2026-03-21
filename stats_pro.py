@@ -5,87 +5,85 @@ import re
 # 1. Настройки страницы
 st.set_page_config(page_title="CS2 Pro Analytics", page_icon="📈", layout="wide")
 
-# 2. Константы (Твой верный ключ и ссылки)
+# 2. Константы
 STEAM_API_KEY = "F0470B6F6D6AFBC9787C40C7507C6B58" 
-TELEGRAM_LINK = "https://t.me/CS2devLog"
-DONATE_LINK = "https://www.donationalerts.com/r/anter404"
+APP_ID_CS2 = 730 # ID Counter-Strike 2 в Steam
 
 # 3. Боковая панель
 with st.sidebar:
     st.title("ANTer404 | Project")
     st.success("Ключ: Active ✅")
     st.divider()
-    st.markdown(f"[📢 Наш Telegram]({TELEGRAM_LINK})")
-    st.markdown(f"[💰 Поддержать проект]({DONATE_LINK})")
-    st.divider()
-    st.caption("v1.2.5 | Stable Build")
+    st.markdown("[📢 Наш Telegram](https://t.me/CS2devLog)")
+    st.caption("v1.2.6 | Stats Update")
 
 st.title("📈 CS2 Pro Analytics")
 
-# 4. Ввод данных
 user_input = st.text_input("Вставь ссылку на профиль Steam:", 
                           placeholder="https://steamcommunity.com/profiles/76561198749701067/")
 
 if user_input:
-    # Извлекаем SteamID64
     found_ids = re.findall(r'\d{17}', user_input)
     
     if found_ids:
         steam_id = found_ids[0]
         
-        # Ссылки для API
+        # API Эндпоинты
         summary_url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
         bans_url = f"https://api.steampowered.com/ISteamUser/GetPlayerBans/v1/?key={STEAM_API_KEY}&steamids={steam_id}"
+        # Новый эндпоинт для времени в играх
+        games_url = f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={STEAM_API_KEY}&steamid={steam_id}&format=json&include_appinfo=1"
         
         try:
-            with st.spinner('Синхронизация со Steam...'):
-                # Запрос данных профиля
-                res_summary = requests.get(summary_url, timeout=10)
-                # Запрос данных о банах
-                res_bans = requests.get(bans_url, timeout=10)
+            with st.spinner('Анализируем игровые данные...'):
+                res_summary = requests.get(summary_url, timeout=10).json()
+                res_bans = requests.get(bans_url, timeout=10).json()
+                res_games = requests.get(games_url, timeout=10).json()
                 
-                if res_summary.status_code == 200:
-                    data = res_summary.json()
-                    players = data.get('response', {}).get('players', [])
+                players = res_summary.get('response', {}).get('players', [])
+                
+                if players:
+                    player = players[0]
+                    col1, col2 = st.columns([1, 3])
                     
-                    if players:
-                        player = players[0]
-                        
-                        # Отображение профиля
-                        col1, col2 = st.columns([1, 3])
-                        
-                        with col1:
-                            st.image(player['avatarfull'], width=200)
-                        
-                        with col2:
-                            st.header(player['personaname'])
-                            
-                            # Проверка банов
-                            if res_bans.status_code == 200:
-                                b_data = res_bans.json().get('players', [{}])[0]
-                                if b_data.get('VACBanned'):
-                                    st.error("🛡️ VAC Статус: Заблокирован")
-                                else:
-                                    st.success("🛡️ VAC Статус: Чист")
-                                    
-                                if b_data.get('CommunityBanned'):
-                                    st.warning("🚫 Бан в сообществе: Присутствует")
-                            
-                            st.write(f"🆔 SteamID64: `{steam_id}`")
-                            st.write(f"🌐 [Ссылка на профиль в Steam]({player['profileurl']})")
-                            
-                        st.divider()
-                        st.info("📊 Статистика CS2 и Инвентарь появятся в следующем обновлении!")
-                        
-                    else:
-                        st.warning("Профиль не найден. Убедись, что он открыт.")
-                else:
-                    st.error(f"Ошибка Steam API: {res_summary.status_code}")
+                    with col1:
+                        st.image(player['avatarfull'], width=200)
                     
-        except Exception as e:
-            st.error(f"Ошибка соединения: {e}")
-    else:
-        st.warning("Пожалуйста, вставь корректную ссылку профиля.")
+                    with col2:
+                        st.header(player['personaname'])
+                        
+                        # Блок статуса безопасности
+                        b_data = res_bans.get('players', [{}])[0]
+                        vac_color = "red" if b_data.get('VACBanned') else "green"
+                        st.markdown(f"🛡️ VAC Статус: :{vac_color}[{'Забанен' if b_data.get('VACBanned') else 'Чист'}]")
+                        
+                        # Извлекаем время в CS2
+                        all_games = res_games.get('response', {}).get('games', [])
+                        cs2_data = next((game for game in all_games if game['appid'] == APP_ID_CS2), None)
+                        
+                        if cs2_data:
+                            # Время в Steam API отдается в минутах
+                            total_minutes = cs2_data.get('playtime_forever', 0)
+                            total_hours = round(total_minutes / 60, 1)
+                            
+                            st.subheader("📊 Статистика CS2")
+                            metrics_col1, metrics_col2 = st.columns(2)
+                            metrics_col1.metric("Всего часов", f"{total_hours} ч.")
+                            
+                            # Время за последние 2 недели
+                            recent_minutes = cs2_data.get('playtime_2weeks', 0)
+                            recent_hours = round(recent_minutes / 60, 1)
+                            metrics_col2.metric("За 2 недели", f"{recent_hours} ч.")
+                        else:
+                            st.warning("🎮 Данные об играх скрыты или CS2 не найдена в библиотеке.")
 
-st.divider()
-st.caption("Powered by Steam Web API | © 2026 ANTer404")
+                        st.write(f"🆔 SteamID64: `{steam_id}`")
+                        st.write(f"🔗 [Профиль в Steam]({player['profileurl']})")
+
+                    st.divider()
+                    st.info("💡 Следующий шаг: Инвентарь и скины")
+                    
+                else:
+                    st.warning("Профиль не найден.")
+        except Exception as e:
+            st.error(f"Ошибка получения данных: {e}")
