@@ -1,116 +1,97 @@
 import streamlit as st
+import requests
 import pandas as pd
 
-# --- КОНФИГУРАЦИЯ v1.9.0 ---
+# ТВОЙ РЕАЛЬНЫЙ КЛЮЧ
+STEAM_API_KEY = "F0470B6F6D6AFBC9787C40C7507C6B58"
+
 st.set_page_config(page_title="ANTer404 | Project", layout="wide")
 
-# --- ИНИЦИАЛИЗАЦИЯ (v1.9.2) ---
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-if 'is_premium' not in st.session_state:
-    st.session_state.is_premium = False
-if 'free_premiums' not in st.session_state:
-    st.session_state.free_premiums = 5
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'is_premium' not in st.session_state: st.session_state.is_premium = False
+if 'free_premiums' not in st.session_state: st.session_state.free_premiums = 5
 
-# --- ЭКРАН ВХОДА (ОРИГИНАЛ) ---
+def get_data(sid):
+    # 1. Профиль и Уровень
+    p_info = requests.get(f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={sid}").json()['response']['players'][0]
+    lvl_res = requests.get(f"http://api.steampowered.com/IPlayerService/GetSteamLevel/v1/?key={STEAM_API_KEY}&steamid={sid}").json()
+    level = lvl_res.get('response', {}).get('player_level', 0)
+    
+    # 2. Статистика CS2
+    s_res = requests.get(f"http://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?appid=730&key={STEAM_API_KEY}&steamid={sid}").json()
+    stats = {s['name']: s['value'] for s in s_res.get('playerstats', {}).get('stats', [])}
+    
+    # 3. Реальный Инвентарь CS2
+    inv_res = requests.get(f"http://api.steampowered.com/IEconService/GetInventoryItemsWithDescriptions/v1/?key={STEAM_API_KEY}&steamid={sid}&appid=730&contextid=2").json()
+    items = inv_res.get('response', {}).get('descriptions', [])
+    
+    return p_info, level, stats, items
+
 if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center;'>CS2 Pro Analytics</h1>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        steam_url = st.text_input("Ссылка на профиль:")
-        if st.button("Войти"):
-            if steam_url:
-                st.session_state.logged_in = True
-                st.session_state.profile_url = steam_url
-                st.rerun()
+    st.title("CS2 Pro Analytics")
+    url_input = st.text_input("Ссылка на профиль Steam:")
+    if st.button("Войти"):
+        try:
+            sid = url_input.strip("/").split("/")[-1]
+            u, lvl, s, inv = get_data(sid)
+            st.session_state.update({"u": u, "lvl": lvl, "s": s, "inv": inv, "logged_in": True})
+            st.rerun()
+        except: st.error("Профиль скрыт или ошибка API")
 else:
-    # --- САЙДБАР (ПО СКРИНШОТАМ) ---
+    u, s, lvl, inv = st.session_state.u, st.session_state.s, st.session_state.lvl, st.session_state.inv
+
     with st.sidebar:
         st.title("ANTer404 | Project")
-        st.write("👤 Уникальных профилей: 2")
+        st.write(f"👤 **{u['personaname']}**")
         if st.button("Выйти"):
             st.session_state.logged_in = False
             st.rerun()
+        st.divider()
+        st.write("🚀 Telegram | 🎁 Трейд | 💰 Донат")
+
+    st.title(f"👋 Привет, {u['personaname']}")
+    t1, t2, t3, t4 = st.tabs(["📊 Статистика", "🎯 Battle Pass", "📦 Инвентарь", "🏆 Топ"])
+
+    with t1:
+        c1, c2 = st.columns([1, 4])
+        c1.image(u['avatarfull'], width=150)
+        with c2:
+            st.subheader(f"🏅 Уровень Steam: {lvl}")
+            st.progress(min(lvl / 100, 1.0))
+            st.caption(f"ID: {u['steamid']}")
         
         st.divider()
-        st.markdown("🚀 [Telegram](#)")
-        st.markdown("🎁 [Трейд](#)")
-        st.markdown("💰 [Донат](#)")
-        st.divider()
-        st.checkbox("Техподдержка")
-        st.caption("v1.9.0 | Tabs & Pass Update")
+        st.subheader("🔫 Мастерство оружия (Live)")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("AK-47 Kills", s.get('total_kills_ak47', 0))
+        col2.metric("AWP Kills", s.get('total_kills_awp', 0))
+        col3.metric("M4A1 Kills", s.get('total_kills_m4a1', 0))
+        col4.metric("Knife Kills", s.get('total_kills_knife', 0))
 
-    # --- ОСНОВНОЙ КОНТЕНТ ---
-    st.title("👋 Привет, ANTer404")
-    
-    # Табы как на скринах
-    tabs = st.tabs(["📊 Статистика", "🎯 Battle Pass", "📦 Инвентарь", "🏆 Топ"])
+        if not st.session_state.is_premium and st.session_state.free_premiums > 0:
+            st.info(f"Акция: Осталось Premium-статусов: {st.session_state.free_premiums}")
+            if st.button("Забрать Premium 💎"):
+                st.session_state.is_premium = True
+                st.session_state.free_premiums -= 1
+                st.rerun()
 
-    # 1. СТАТИСТИКА
-    with tabs[0]:
-        col_ava, col_main = st.columns([1, 4])
-        with col_ava:
-            st.image("https://via.placeholder.com/150") # Твой Rick аватара
-        with col_main:
-            st.subheader("🏅 Уровень: 7")
-            st.progress(0.85) # Синяя полоска
-            st.caption("XP: 5615 | До следующего: 839 XP")
-            st.write("⌚ **Часов в игре:** 19.8")
-
-        st.divider()
-        st.subheader("🔫 Мастерство оружия")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("AK-47", "61")
-        m2.metric("AWP", "63")
-        m3.metric("M4A1", "86")
-        m4.metric("Knife", "0")
-        
-        st.divider()
-        k1, k2, k3 = st.columns(3)
-        k1.metric("K/D", "0.64")
-        k2.metric("HS Count", "161")
-        k3.metric("Wins", "110")
-
-        # ТВОЯ ЕДИНСТВЕННАЯ ДОБАВЛЕННАЯ ФУНКЦИЯ
-        st.divider()
-        if not st.session_state.is_premium:
-            if st.session_state.free_premiums > 0:
-                st.info(f"Акция: Осталось бесплатных Premium-статусов: {st.session_state.free_premiums}")
-                if st.button("Забрать Premium 💎"):
-                    st.session_state.is_premium = True
-                    st.session_state.free_premiums -= 1
-                    st.balloons()
-                    st.rerun()
-
-    # 2. BATTLE PASS (КВЕСТЫ С ПРОГРЕСС-БАРАМИ)
-    with tabs[1]:
+    with t2:
         st.header("🎯 Сезонные квесты")
+        tk = s.get('total_kills', 0)
+        st.write(f"**Мастер стрельбы:** {tk} / 1000")
+        st.progress(min(tk/1000, 1.0))
         
-        st.write("**Мастер стрельбы:** Набей 1000 киллов")
-        st.progress(0.64); st.caption("Прогресс: 640 / 1000")
-        
-        st.write("**Снайпер:** Поставь 500 хэдшотов")
-        st.progress(0.32); st.caption("Прогресс: 161 / 500")
-        
-        st.write("**Головорез:** 50 фрагов с ножа")
-        st.progress(0.0); st.caption("Прогресс: 0 / 50")
-        
-        st.write("**Победитель:** Выиграй 100 раундов")
-        st.progress(1.0); st.caption("Прогресс: 110 / 110")
+        ths = s.get('total_kills_headshot', 0)
+        st.write(f"**Снайпер (HS):** {ths} / 500")
+        st.progress(min(ths/500, 1.0))
 
-    # 3. ИНВЕНТАРЬ
-    with tabs[2]:
-        st.header("📦 Твой инвентарь")
-        st.markdown("🔴 **Наклейка | Into The Breach | Париж-2023**")
-        st.write("💰 $0.03")
+    with t3:
+        st.header("📦 Твой инвентарь (Live)")
+        if not inv: st.write("Инвентарь пуст или скрыт.")
+        for item in inv[:10]: # Показываем первые 10 предметов
+            st.write(f"🔹 {item.get('name')} ({item.get('type')})")
 
-    # 4. ТОП (ТАБЛИЦА)
-    with tabs[3]:
+    with t4:
         st.header("🏆 Глобальный Топ")
-        # Создаем таблицу как на скрине
-        df = pd.DataFrame({
-            "Игрок": ["ANTer404", "ANTer404"],
-            "Уровень": [7, 3],
-            "XP": [5615, 1395]
-        })
-        st.table(df)
+        prefix = "🌟" if st.session_state.is_premium else "👤"
+        st.table(pd.DataFrame({"Игрок": [f"{prefix} {u['personaname']}"], "Уровень": [lvl], "Kills": [tk]}))
