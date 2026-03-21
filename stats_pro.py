@@ -1,144 +1,113 @@
 import streamlit as st
 import requests
 import re
-import time
+import os
 
-# 1. Настройки страницы
+# 1. Настройки и URL-память
 st.set_page_config(page_title="CS2 Pro Analytics", page_icon="📈", layout="wide")
 
 # 2. Константы
 STEAM_API_KEY = "F0470B6F6D6AFBC9787C40C7507C6B58" 
 APP_ID_CS2 = 730
-TELEGRAM_LINK = "https://t.me/CS2devLog"
-TRADE_LINK = "https://steamcommunity.com/tradeoffer/new/?partner=789435339&token=ftuQJ9Sg"
-DONATE_LINK = "https://www.donationalerts.com/r/anter404"
-CONTACT_EMAIL = "cs2-pro-help@mail.ru" 
+COUNTER_FILE = "user_count.txt"
 
-# 3. Функция получения цены (Market API)
-def get_item_price(market_hash_name):
-    try:
-        url = f"https://steamcommunity.com/market/priceoverview/?appid={APP_ID_CS2}&currency=1&market_hash_name={market_hash_name}"
-        res = requests.get(url, timeout=5).json()
-        if res.get('success'):
-            return res.get('lowest_price', 'N/A')
-    except:
-        return "🛠️"
-    return "N/A"
+# 3. Функции логики
+def get_user_count():
+    if not os.path.exists(COUNTER_FILE):
+        with open(COUNTER_FILE, "w") as f: f.write("0")
+    with open(COUNTER_FILE, "r") as f: return int(f.read())
 
-# 4. Сессии
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-if 'steam_id' not in st.session_state: st.session_state.steam_id = ""
+def increment_user_count():
+    count = get_user_count() + 1
+    with open(COUNTER_FILE, "w") as f: f.write(str(count))
 
-# 5. Боковая панель
+# Расчет уровня
+def calculate_level(kills, hs):
+    xp = (kills * 10) + (hs * 25) # За убийство 10 XP, за хэдшот +25 XP
+    level = int(xp / 1000) + 1 # Каждые 1000 XP — новый уровень
+    progress = (xp % 1000) / 10 # Процент до следующего уровня
+    return level, progress, xp
+
+# 4. Проверка сессии через URL
+if "user" in st.query_params and 'logged_in' not in st.session_state:
+    st.session_state.steam_id = st.query_params["user"]
+    st.session_state.logged_in = True
+
+# 5. Сайдбар
 with st.sidebar:
     st.title("ANTer404 | Project")
-    if st.session_state.logged_in:
-        st.success("✅ Аккаунт привязан")
+    st.metric("👤 Всего в системе", get_user_count())
+    if st.session_state.get('logged_in'):
         if st.button("Выйти"):
-            st.session_state.logged_in = False
+            st.query_params.clear()
+            st.session_state.clear()
             st.rerun()
-    
     st.divider()
-    st.subheader("⚙️ Настройки")
-    theme = st.radio("Тема сайта:", ["Темная", "Светлая"])
-    
-    if theme == "Светлая":
-        st.markdown("""<style>
-            .stApp { background-color: white; color: black; }
-            [data-testid="stMetricValue"] { color: #FF4B4B !important; }
-            section[data-testid="stSidebar"] { background-color: #f0f2f6; }
-            h1, h2, h3, p, span { color: black !important; }
-        </style>""", unsafe_allow_html=True)
+    theme = st.radio("Тема:", ["Темная", "Светлая"])
+    st.caption("v1.7.0 | Battle Pass Update")
 
-    st.divider()
-    st.markdown(f"### [🚀 Наш Telegram]({TELEGRAM_LINK})")
-    st.markdown(f"### [🎁 Поддержать трейдом]({TRADE_LINK})")
-    st.markdown(f"### [💰 Донат (Деньги)]({DONATE_LINK})")
-    
-    st.divider()
-    st.subheader("🛠️ Техподдержка")
-    support_mode = st.checkbox("Написать админу")
-    st.caption("v1.6.1 | Full & Market Edition")
-
-# 6. ТЕХПОДДЕРЖКА
-if support_mode:
-    st.header("📩 Техническая поддержка")
-    contact_form = f"""
-    <form action="https://formsubmit.co/{CONTACT_EMAIL}" method="POST" enctype="multipart/form-data">
-    <input type="email" name="email" placeholder="Твоя почта" required style="width:100%; margin-bottom:10px; padding:10px; border-radius:5px; border:1px solid #333;">
-    <textarea name="message" placeholder="Ваш вопрос..." required style="width:100%; height:120px; margin-bottom:10px; padding:10px; border-radius:5px; border:1px solid #333;"></textarea>
-    <button type="submit" style="background-color:#ff4b4b; color:white; border:none; padding:12px; border-radius:5px; width:100%; font-weight:bold; cursor:pointer;">Отправить</button>
-    </form>
-    """
-    st.markdown(contact_form, unsafe_allow_html=True)
-
-# 7. ГЛАВНЫЙ ЭКРАН
-elif not st.session_state.logged_in:
+# 6. Экран входа
+if not st.session_state.get('logged_in'):
     st.title("📈 CS2 Pro Analytics")
-    user_input = st.text_input("Вставьте ссылку на профиль Steam:")
-    if st.button("Войти"):
+    user_input = st.text_input("Вставьте ссылку на Steam для входа:")
+    if st.button("Войти и начать прокачку"):
         found = re.findall(r'\d{17}', user_input)
         if found:
-            st.session_state.steam_id = found[0]
+            sid = found[0]
+            st.session_state.steam_id = sid
             st.session_state.logged_in = True
+            st.query_params["user"] = sid
+            increment_user_count()
             st.rerun()
+
+# 7. Личный кабинет с Уровнями
 else:
     steam_id = st.session_state.steam_id
     try:
-        with st.spinner('Синхронизация со Steam...'):
-            summary_url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
-            stats_url = f"https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?appid={APP_ID_CS2}&key={STEAM_API_KEY}&steamid={steam_id}"
-            games_url = f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={STEAM_API_KEY}&steamid={steam_id}&format=json&include_appinfo=1"
-            inv_url = f"https://steamcommunity.com/inventory/{steam_id}/{APP_ID_CS2}/2?l=russian&count=50"
+        # Загрузка данных
+        summary = requests.get(f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}").json()
+        stats_res = requests.get(f"https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?appid={APP_ID_CS2}&key={STEAM_API_KEY}&steamid={steam_id}").json()
+        
+        player = summary['response']['players'][0]
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.image(player['avatarfull'], width=150)
+        with col2:
+            st.header(f"Боец: {player['personaname']}")
             
-            res_summary = requests.get(summary_url).json()
-            res_stats = requests.get(stats_url).json()
-            res_games = requests.get(games_url).json()
-            res_inv = requests.get(inv_url).json()
-            
-            player = res_summary['response']['players'][0]
-            
-            col1, col2 = st.columns([1, 4])
-            with col1: st.image(player['avatarfull'], width=150)
-            with col2:
-                st.header(player['personaname'])
-                all_games = res_games.get('response', {}).get('games', [])
-                cs2_data = next((g for g in all_games if g['appid'] == APP_ID_CS2), None)
-                if cs2_data:
-                    st.write(f"🎮 Часов в CS2: **{round(cs2_data.get('playtime_forever', 0) / 60, 1)} ч.**")
+            if 'playerstats' in stats_res:
+                s = {i['name']: i['value'] for i in stats_res['playerstats']['stats']}
+                kills = s.get('total_kills', 0)
+                hs = s.get('total_kills_headshot', 0)
                 
-                if 'playerstats' in res_stats:
-                    s = {i['name']: i['value'] for i in res_stats['playerstats']['stats']}
-                    k, d = s.get('total_kills', 0), s.get('total_deaths', 1)
-                    st.divider()
-                    m1, m2, m3 = st.columns(3)
-                    m1.metric("K/D Ratio", round(k/d, 2))
-                    m2.metric("Headshots", s.get('total_kills_headshot', 0))
-                    m3.metric("Total Kills", k)
+                # РАСЧЕТ УРОВНЯ
+                lvl, prog, total_xp = calculate_level(kills, hs)
+                
+                st.subheader(f"🎖️ Уровень: {lvl}")
+                st.progress(prog / 100)
+                st.caption(f"Всего XP: {total_xp} | До уровня {lvl+1} осталось {100 - int(prog)}%")
 
-            st.divider()
-            st.subheader("📦 Твой инвентарь и цены")
-            
-            if res_inv and 'descriptions' in res_inv:
-                items = res_inv['descriptions']
-                grid = st.columns(5)
-                for idx, item in enumerate(items):
-                    with grid[idx % 5]:
-                        img = item.get('icon_url')
-                        st.image(f"https://community.akamai.steamstatic.com/economy/image/{img}/128fx128f")
-                        
-                        # ЦЕНЫ (ограничено первыми 10 для скорости)
-                        if idx < 10:
-                            price = get_item_price(item.get('market_hash_name'))
-                            st.markdown(f"💰 **{price}**")
-                        
-                        name = item.get('market_name')
-                        color = item.get('name_color', 'FFFFFF')
-                        st.markdown(f"<p style='color:#{color}; font-size:11px; font-weight:bold;'>{name}</p>", unsafe_allow_html=True)
+                st.divider()
+                
+                # ЗАДАНИЯ (КВЕСТЫ)
+                st.markdown("### 🎯 Текущие квесты")
+                q1_target = 1000
+                q2_target = 500
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.write(f"**Мастер стрельбы:** Набей {q1_target} киллов")
+                    st.progress(min(kills/q1_target, 1.0))
+                    st.write(f"{kills} / {q1_target}")
+                
+                with c2:
+                    st.write(f"**Снайпер:** Поставь {q2_target} хэдшотов")
+                    st.progress(min(hs/q2_target, 1.0))
+                    st.write(f"{hs} / {q2_target}")
+
             else:
-                st.info("Инвентарь не подгрузился.")
-    except:
-        st.error("Steam API Error")
+                st.warning("⚠️ Открой статку в Steam, чтобы качать уровень!")
 
-st.divider()
-st.caption("Developed by ANTer404 | 2026")
+    except Exception as e:
+        st.error(f"Ошибка API: {e}")
