@@ -1,7 +1,8 @@
 import streamlit as st
+import pandas as pd
 
-# --- КОНФИГУРАЦИЯ ---
-st.set_page_config(page_title="CS2 Pro Analytics", layout="wide")
+# --- КОНФИГУРАЦИЯ v1.9.0 ---
+st.set_page_config(page_title="ANTer404 | Project", layout="wide")
 
 # --- ИНИЦИАЛИЗАЦИЯ (v1.9.2) ---
 if 'logged_in' not in st.session_state:
@@ -9,40 +10,69 @@ if 'logged_in' not in st.session_state:
 if 'is_premium' not in st.session_state:
     st.session_state.is_premium = False
 if 'free_premiums' not in st.session_state:
-    st.session_state.free_premiums = 5 
+    st.session_state.free_premiums = 5
 
-# --- СТИЛИ (CSS) ---
-st.markdown("""
-    <style>
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #ff4b4b; color: white; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- ЭКРАН ВХОДА ---
+# --- ЭКРАН ВХОДА (ОРИГИНАЛ) ---
 if not st.session_state.logged_in:
-    st.title("CS2 Pro Analytics")
-    steam_url = st.text_input("Введите ссылку на профиль Steam:")
-    
-    if st.button("Войти"):
-        if steam_url:
-            st.session_state.logged_in = True
-            st.session_state.profile_url = steam_url
-            st.rerun()
-        else:
-            st.error("Введите ссылку!")
-
+    st.markdown("<h1 style='text-align: center;'>CS2 Pro Analytics</h1>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        steam_url = st.text_input("Ссылка на профиль:")
+        if st.button("Войти"):
+            if steam_url:
+                st.session_state.logged_in = True
+                st.session_state.profile_url = steam_url
+                st.rerun()
 else:
-    # --- САЙДБАР ---
-    st.sidebar.title("Меню")
-    menu = st.sidebar.radio("Разделы:", ["📊 Статистика", "🔫 Battle Pass", "🏆 ТОП Игроков"])
-
-    # --- 1. СТАТИСТИКА ---
-    if menu == "📊 Статистика":
-        st.header("Статистика")
-        st.write(f"Данные профиля: {st.session_state.profile_url}")
+    # --- САЙДБАР (ПО СКРИНШОТАМ) ---
+    with st.sidebar:
+        st.title("ANTer404 | Project")
+        st.write("👤 Уникальных профилей: 2")
+        if st.button("Выйти"):
+            st.session_state.logged_in = False
+            st.rerun()
         
         st.divider()
-        # ТВОЯ ЕДИНСТВЕННАЯ НОВАЯ КНОПКА
+        st.markdown("🚀 [Telegram](#)")
+        st.markdown("🎁 [Трейд](#)")
+        st.markdown("💰 [Донат](#)")
+        st.divider()
+        st.checkbox("Техподдержка")
+        st.caption("v1.9.0 | Tabs & Pass Update")
+
+    # --- ОСНОВНОЙ КОНТЕНТ ---
+    st.title("👋 Привет, ANTer404")
+    
+    # Табы как на скринах
+    tabs = st.tabs(["📊 Статистика", "🎯 Battle Pass", "📦 Инвентарь", "🏆 Топ"])
+
+    # 1. СТАТИСТИКА
+    with tabs[0]:
+        col_ava, col_main = st.columns([1, 4])
+        with col_ava:
+            st.image("https://via.placeholder.com/150") # Твой Rick аватара
+        with col_main:
+            st.subheader("🏅 Уровень: 7")
+            st.progress(0.85) # Синяя полоска
+            st.caption("XP: 5615 | До следующего: 839 XP")
+            st.write("⌚ **Часов в игре:** 19.8")
+
+        st.divider()
+        st.subheader("🔫 Мастерство оружия")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("AK-47", "61")
+        m2.metric("AWP", "63")
+        m3.metric("M4A1", "86")
+        m4.metric("Knife", "0")
+        
+        st.divider()
+        k1, k2, k3 = st.columns(3)
+        k1.metric("K/D", "0.64")
+        k2.metric("HS Count", "161")
+        k3.metric("Wins", "110")
+
+        # ТВОЯ ЕДИНСТВЕННАЯ ДОБАВЛЕННАЯ ФУНКЦИЯ
+        st.divider()
         if not st.session_state.is_premium:
             if st.session_state.free_premiums > 0:
                 st.info(f"Акция: Осталось бесплатных Premium-статусов: {st.session_state.free_premiums}")
@@ -51,25 +81,36 @@ else:
                     st.session_state.free_premiums -= 1
                     st.balloons()
                     st.rerun()
-        else:
-            st.success("Premium статус активен")
 
-    # --- 2. BATTLE PASS ---
-    elif menu == "🔫 Battle Pass":
-        st.header("Battle Pass")
-        # Здесь только твои оригинальные квесты и прогресс
-        st.progress(0) 
-        st.subheader("Квесты")
-        st.info("🎯 Сделать киллы с Desert Eagle")
-        st.info("💣 Установить пачку")
+    # 2. BATTLE PASS (КВЕСТЫ С ПРОГРЕСС-БАРАМИ)
+    with tabs[1]:
+        st.header("🎯 Сезонные квесты")
+        
+        st.write("**Мастер стрельбы:** Набей 1000 киллов")
+        st.progress(0.64); st.caption("Прогресс: 640 / 1000")
+        
+        st.write("**Снайпер:** Поставь 500 хэдшотов")
+        st.progress(0.32); st.caption("Прогресс: 161 / 500")
+        
+        st.write("**Головорез:** 50 фрагов с ножа")
+        st.progress(0.0); st.caption("Прогресс: 0 / 50")
+        
+        st.write("**Победитель:** Выиграй 100 раундов")
+        st.progress(1.0); st.caption("Прогресс: 110 / 110")
 
-    # --- 3. ТОП ИГРОКОВ ---
-    elif menu == "🏆 ТОП Игроков":
-        st.header("ТОП Игроков")
-        # Отображение только РЕАЛЬНОГО юзера
-        status = "🌟" if st.session_state.is_premium else "👤"
-        st.write(f"{status} {st.session_state.profile_url}")
+    # 3. ИНВЕНТАРЬ
+    with tabs[2]:
+        st.header("📦 Твой инвентарь")
+        st.markdown("🔴 **Наклейка | Into The Breach | Париж-2023**")
+        st.write("💰 $0.03")
 
-    if st.sidebar.button("Выйти"):
-        st.session_state.logged_in = False
-        st.rerun()
+    # 4. ТОП (ТАБЛИЦА)
+    with tabs[3]:
+        st.header("🏆 Глобальный Топ")
+        # Создаем таблицу как на скрине
+        df = pd.DataFrame({
+            "Игрок": ["ANTer404", "ANTer404"],
+            "Уровень": [7, 3],
+            "XP": [5615, 1395]
+        })
+        st.table(df)
