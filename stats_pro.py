@@ -1,62 +1,58 @@
 import streamlit as st
 
 # --- КОНФИГУРАЦИЯ ---
-st.set_page_config(page_title="CS2 Pro Analytics", layout="wide")
+st.set_page_config(page_title="CS2 Pro Analytics")
 
-# ТВОЙ ID
+# ТВОЙ ID ДЛЯ АДМИНКИ
 YOUR_ADMIN_ID = 7876507389 
 
-# --- ИНИЦИАЛИЗАЦИЯ v1.9.2 ---
+# --- БАЗОВЫЕ ДАННЫЕ v1.9.2 ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
-if 'user_id' not in st.session_state:
-    st.session_state.user_id = 0
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-if 'profile_url' not in st.session_state:
-    st.session_state.profile_url = ""
 if 'is_premium' not in st.session_state:
     st.session_state.is_premium = False
 if 'free_premiums' not in st.session_state:
     st.session_state.free_premiums = 5
 
-# --- ОКНО ВХОДА / РЕГИСТРАЦИИ ---
+# --- ВХОД (ТОЛЬКО ТО, ЧТО ТЫ ПРОСИЛ) ---
 if not st.session_state.logged_in:
-    st.title("📈 CS2 Pro Analytics v1.9.2")
+    st.title("CS2 Pro Analytics")
     
-    u_id = st.number_input("Telegram ID:", step=1, value=0)
-    u_name = st.text_input("Никнейм:")
-    u_url = st.text_input("Ссылка на профиль:")
+    # Твои новые поля для регистрации
+    id_input = st.number_input("Telegram ID:", step=1, value=0)
+    name_input = st.text_input("Никнейм:")
+    url_input = st.text_input("Ссылка на профиль:")
     
     if st.button("Войти"):
-        if u_name and u_id > 0 and u_url:
+        if name_input and id_input > 0 and url_input:
             st.session_state.logged_in = True
-            st.session_state.username = u_name
-            st.session_state.user_id = u_id
-            st.session_state.profile_url = u_url
+            st.session_state.username = name_input
+            st.session_state.user_id = id_input
+            st.session_state.profile_url = url_input
             st.rerun()
         else:
             st.error("Заполни все поля!")
 
 else:
-    # --- САЙДБАР ---
-    st.sidebar.header(f"Юзер: {st.session_state.username}")
+    # --- ТВОЙ ПРИВЫЧНЫЙ САЙДБАР ---
+    st.sidebar.write(f"Привет, {st.session_state.username}")
     
+    # Проверка на админа (только для твоего ID)
     menu = ["Статистика", "Battle Pass", "ТОП"]
     if st.session_state.user_id == YOUR_ADMIN_ID:
         menu.append("АДМИНКА")
     
     choice = st.sidebar.radio("Меню", menu)
 
-    # --- РАЗДЕЛЫ ---
+    # --- ТВОИ РАЗДЕЛЫ (БЕЗ МОЕГО МУСОРА) ---
     if choice == "Статистика":
-        st.subheader("Твои показатели")
-        st.write(f"Профиль: {st.session_state.profile_url}")
+        st.header("Статистика")
+        st.write(f"Ссылка: {st.session_state.profile_url}")
         
-        # Тот самый блок для ТикТока
         st.divider()
+        # Блок с премиумом для ролика
         if not st.session_state.is_premium:
-            st.info(f"Свободно Premium-мест: {st.session_state.free_premiums}")
+            st.write(f"Осталось фри-премиумов: {st.session_state.free_premiums}")
             if st.button("Забрать Premium 💎"):
                 if st.session_state.free_premiums > 0:
                     st.session_state.is_premium = True
@@ -64,26 +60,29 @@ else:
                     st.balloons()
                     st.rerun()
         else:
-            st.success("У тебя есть Premium!")
+            st.success("Premium активен")
 
     elif choice == "Battle Pass":
-        st.subheader("Прогресс BP")
-        st.progress(45)
+        st.header("Battle Pass")
         st.write("Уровень: 11")
+        st.progress(45)
 
     elif choice == "ТОП":
-        st.subheader("Лидеры")
-        # Показываем тебя со звездой, если есть преимум
-        status = "🌟" if st.session_state.is_premium else "👤"
-        st.write(f"{status} {st.session_state.username} — 1100 pts")
+        st.header("ТОП Игроков")
+        # Твой ник со звездой если купил преимум
+        if st.session_state.is_premium:
+            st.write(f"🌟 {st.session_state.username} — 1100 pts")
+        else:
+            st.write(f"👤 {st.session_state.username} — 1100 pts")
         st.write("👤 s1mple — 2500 pts")
+        st.write("👤 donk — 2400 pts")
 
     elif choice == "АДМИНКА":
-        st.subheader("Панель управления")
-        new_count = st.number_input("Изменить кол-во премов:", value=st.session_state.free_premiums)
-        if st.button("Обновить"):
+        st.header("Админка")
+        new_count = st.number_input("Кол-во премиумов:", value=st.session_state.free_premiums)
+        if st.button("Сохранить"):
             st.session_state.free_premiums = int(new_count)
-            st.success("Готово!")
+            st.success("Обновлено")
 
     if st.sidebar.button("Выход"):
         st.session_state.logged_in = False
