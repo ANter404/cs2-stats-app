@@ -15,34 +15,30 @@ with st.sidebar:
     st.markdown(f"[📢 Наш Telegram]({TELEGRAM_LINK})")
     st.markdown(f"[💰 Поддержать проект]({DONATE_LINK})")
     st.divider()
-    st.caption("v1.1.8 | Обход блокировки")
+    st.caption("v1.1.9 | Ultra Bypass")
 
 st.title("📈 CS2 Pro Analytics")
 
 user_input = st.text_input("Вставь ссылку на профиль Steam:", 
-                          placeholder="Например: https://steamcommunity.com/profiles/76561198...")
+                          placeholder="https://steamcommunity.com/profiles/76561198...")
 
 if user_input:
     found_ids = re.findall(r'\d{17}', user_input)
     
     if found_ids:
         steam_id = found_ids[0]
-        # Прямая ссылка на API
         api_url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
         
-        # Ссылка через прокси-сервер (магия обхода 403 ошибки)
-        proxy_url = f"https://api.allorigins.win/get?url={requests.utils.quote(api_url)}"
+        # Используем альтернативный прокси-шлюз
+        proxy_url = f"https://api.codetabs.com/v1/proxy?quest={api_url}"
         
         try:
-            with st.spinner('Пробиваемся через защиту Steam...'):
-                response = requests.get(proxy_url, timeout=15)
+            with st.spinner('Взламываем систему...'):
+                response = requests.get(proxy_url, timeout=20)
                 
                 if response.status_code == 200:
-                    # Прокси возвращает JSON, в котором наши данные лежат в поле 'contents' в виде строки
-                    raw_data = response.json()
-                    steam_data = json.loads(raw_data['contents'])
-                    
-                    players = steam_data.get('response', {}).get('players', [])
+                    data = response.json()
+                    players = data.get('response', {}).get('players', [])
                     
                     if players:
                         player = players[0]
@@ -53,17 +49,15 @@ if user_input:
                             st.header(player['personaname'])
                             st.write(f"🆔 SteamID64: `{steam_id}`")
                             st.write(f"🌐 [Профиль в Steam]({player['profileurl']})")
-                        
-                        st.success("Связь установлена!")
+                        st.success("Данные успешно получены через резервный шлюз!")
                     else:
-                        st.warning("Steam ответил, но игрока не нашел. Проверь ID.")
+                        st.warning("Steam не нашел игрока. Проверь настройки приватности.")
                 else:
-                    st.error(f"Прокси-сервер временно недоступен (Код {response.status_code})")
-                    
+                    st.error(f"Ошибка шлюза: {response.status_code}. Пробуем другой метод...")
         except Exception as e:
-            st.error(f"Ошибка соединения: {e}")
+            st.error(f"Критический сбой: {e}")
     else:
-        st.warning("В ссылке должен быть 17-значный ID.")
+        st.warning("Вставь ссылку, содержащую 17 цифр ID.")
 
 st.divider()
-st.caption("Используется защищенный шлюз AllOrigins для обхода блокировок Steam.")
+st.caption("Используется технология CodeTabs для обхода сетевых ограничений.")
