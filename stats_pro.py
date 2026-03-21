@@ -1,97 +1,74 @@
 import streamlit as st
 import requests
 
-# Твой ключ вшит навсегда
-STEAM_API_KEY = "F0470B6F6D6AFBC9787C40C7507C6B58"
+# Настройки страницы
+st.set_page_config(page_title="CS2 Pro Analytics", page_icon="📈", layout="wide")
 
-st.set_page_config(page_title="ANTer404 CS2 Stats", page_icon="📊", layout="wide")
+# КОНФИГУРАЦИЯ
+STEAM_API_KEY = "80562D785863D2DB396C004F7547514D" 
+TELEGRAM_LINK = "https://t.me/CS2devLog"
+DONATE_LINK = "https://www.donationalerts.com/r/anter404"
 
-# Проверка сессии
-if "steam_user" not in st.session_state:
-    st.session_state["steam_user"] = None
+# Кастомный стиль боковой панели
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {
+        background-color: #1a1c24;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+    }
+    </style>
+    """, unsafe_allow_index=True)
 
-def get_steam_data(profile_url):
-    try:
-        # 1. Получаем SteamID из ссылки
-        if "profiles" in profile_url:
-            sid = profile_url.strip("/").split("/")[-1]
-        else:
-            v_url = profile_url.strip("/").split("/")[-1]
-            res = requests.get(f"http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key={STEAM_API_KEY}&vanityurl={v_url}").json()
-            sid = res['response']['steamid']
-        
-        # 2. Инфо о профиле (Аватар, Ник)
-        user = requests.get(f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={sid}").json()['response']['players'][0]
-        
-        # 3. Инфо об играх (Ищем CS2 - AppID 730)
-        games_url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={STEAM_API_KEY}&steamid={sid}&format=json&include_appinfo=1"
-        games = requests.get(games_url).json()
-        
-        cs2_info = None
-        if 'games' in games['response']:
-            cs2_info = next((g for g in games['response']['games'] if g['appid'] == 730), None)
-            
-        return user, cs2_info
-    except Exception as e:
-        return None, None
-
-# --- ИНТЕРФЕЙС ---
-if not st.session_state["steam_user"]:
-    st.title("🎮 Вход в ANTer404 Analytics")
-    st.subheader("Авторизация через Steam")
+# Боковая панель (Sidebar)
+with st.sidebar:
+    st.image("https://avatars.akamai.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg", width=100)
+    st.title("ANTer404 | Project")
+    st.info(f"**Версия:** 1.1 (Beta)\n\n**Статус:** Разработка (День 2)")
     
-    url = st.text_input("Вставь ссылку на профиль Steam:", placeholder="https://steamcommunity.com/id/your_nick/")
+    st.markdown("### 🔗 Ресурсы")
+    st.markdown(f"[![Telegram](https://img.shields.io/badge/Telegram-Канал-blue?style=for-the-badge&logo=telegram)]({TELEGRAM_LINK})")
+    st.write("")
+    st.markdown(f"[![Donate](https://img.shields.io/badge/Поддержать-Разработку-orange?style=for-the-badge&logo=donationalerts)]({DONATE_LINK})")
     
-    if st.button("Синхронизировать данные", use_container_width=True):
-        with st.spinner("Связываемся со Steam..."):
-            u, g = get_steam_data(url)
-            if u:
-                st.session_state["steam_user"] = u
-                st.session_state["cs2_data"] = g
-                st.rerun()
-            else:
-                st.error("Ошибка! Проверь ссылку или настройки приватности профиля.")
-else:
-    u = st.session_state["steam_user"]
-    g = st.session_state["cs2_data"]
-    
-    # Боковая панель
-    st.sidebar.image(u['avatarfull'], width=200)
-    st.sidebar.title(u['personaname'])
-    st.sidebar.write(f"ID: `{u['steamid']}`")
-    
-    if st.sidebar.button("Выйти из системы"):
-        st.session_state["steam_user"] = None
-        st.rerun()
-
-    # Основной экран
-    st.title(f"🚀 Дашборд игрока: {u['personaname']}")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.info("📊 Статистика аккаунта")
-        st.write(f"**Страна:** {u.get('loccountrycode', 'Скрыто')}")
-        st.write(f"**Профиль:** [Открыть в Steam]({u['profileurl']})")
-        if 'timecreated' in u:
-            import datetime
-            date = datetime.datetime.fromtimestamp(u['timecreated']).year
-            st.write(f"**Аккаунт создан:** {date} г.")
-
-    with col2:
-        st.success("🔫 Данные Counter-Strike 2")
-        if g:
-            hours = round(g['playtime_forever'] / 60, 1)
-            st.metric("Общее время в игре", f"{hours} ч.")
-            
-            if 'playtime_2weeks' in g:
-                two_weeks = round(g['playtime_2weeks'] / 60, 1)
-                st.write(f"🔥 Активность за 14 дней: **{two_weeks} ч.**")
-            else:
-                st.write("Последние 2 недели не играл.")
-        else:
-            st.warning("⚠️ Не удалось получить время игры. Сделай 'Игровую информацию' открытой в настройках Steam.")
-
     st.divider()
-    st.subheader("📈 Твои достижения")
-    st.write("Скоро здесь будет детальный разбор твоих медалей и ачивок!")
+    st.caption("© 2026 ANTer404 Development")
+
+# Основной интерфейс
+st.title("📈 CS2 Pro Analytics")
+st.subheader("Система анализа и статистики профилей Steam")
+
+# Ввод Steam ID
+steam_input = st.text_input("Введите Steam ID 64 (например, 7656119...):", placeholder="7656119...")
+
+if steam_input:
+    # 1. Получаем данные профиля через API
+    url_profile = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_input}"
+    
+    try:
+        res = requests.get(url_profile).json()
+        
+        if res['response']['players']:
+            player = res['response']['players'][0]
+            col1, col2 = st.columns([1, 4])
+            
+            with col1:
+                st.image(player['avatarfull'], width=150)
+            with col2:
+                st.header(player['personaname'])
+                st.write(f"🌐 [Открыть профиль в Steam]({player['profileurl']})")
+                
+            # 2. Модуль инвентаря
+            st.divider()
+            st.header("📦 Инвентарь CS2")
+            with st.expander("Просмотр скинов и предметов", expanded=True):
+                st.warning("🔄 Модуль загрузки инвентаря находится в процессе интеграции. Ожидайте в v1.2.")
+        else:
+            st.error("Профиль не найден. Убедитесь, что введен корректный Steam ID 64.")
+    except Exception as e:
+        st.error(f"Ошибка подключения к Steam API: {e}")
+
+st.divider()
+st.caption("Данные подгружаются напрямую через официальный Steam Web API.")
