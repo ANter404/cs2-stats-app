@@ -1,12 +1,11 @@
 import streamlit as st
 import requests
 import re
-import json
 
 # Настройки
 st.set_page_config(page_title="CS2 Pro Analytics", page_icon="📈", layout="wide")
 
-STEAM_API_KEY = "80562D785863D2DB396C004F7547514D" 
+# Твои ссылки
 TELEGRAM_LINK = "https://t.me/CS2devLog"
 DONATE_LINK = "https://www.donationalerts.com/r/anter404"
 
@@ -15,26 +14,29 @@ with st.sidebar:
     st.markdown(f"[📢 Наш Telegram]({TELEGRAM_LINK})")
     st.markdown(f"[💰 Поддержать проект]({DONATE_LINK})")
     st.divider()
-    st.caption("v1.1.9 | Ultra Bypass")
+    st.caption("v1.2.0 | Direct Mode")
 
 st.title("📈 CS2 Pro Analytics")
 
+# Поле для ключа (на случай, если твой забанили, можно будет вставить другой)
+# Но по умолчанию используем твой
+api_key = st.sidebar.text_input("Steam API Key:", value="80562D785863D2DB396C004F7547514D", type="password")
+
 user_input = st.text_input("Вставь ссылку на профиль Steam:", 
-                          placeholder="https://steamcommunity.com/profiles/76561198...")
+                          placeholder="Например: https://steamcommunity.com/profiles/76561198...")
 
 if user_input:
     found_ids = re.findall(r'\d{17}', user_input)
     
     if found_ids:
         steam_id = found_ids[0]
-        api_url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
-        
-        # Используем альтернативный прокси-шлюз
-        proxy_url = f"https://api.codetabs.com/v1/proxy?quest={api_url}"
+        # Используем стандартный эндпоинт без прокси для проверки
+        url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={api_key}&steamids={steam_id}"
         
         try:
-            with st.spinner('Взламываем систему...'):
-                response = requests.get(proxy_url, timeout=20)
+            with st.spinner('Связываемся со Steam...'):
+                # Добавляем очень длинный таймаут
+                response = requests.get(url, timeout=30)
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -49,15 +51,16 @@ if user_input:
                             st.header(player['personaname'])
                             st.write(f"🆔 SteamID64: `{steam_id}`")
                             st.write(f"🌐 [Профиль в Steam]({player['profileurl']})")
-                        st.success("Данные успешно получены через резервный шлюз!")
+                        st.success("Успешное подключение!")
                     else:
-                        st.warning("Steam не нашел игрока. Проверь настройки приватности.")
+                        st.warning("Steam не нашел игрока. Возможно, профиль скрыт настройками приватности.")
                 else:
-                    st.error(f"Ошибка шлюза: {response.status_code}. Пробуем другой метод...")
+                    st.error(f"Ошибка Steam API: {response.status_code}")
+                    st.info("Это значит, что Steam блокирует сервер хостинга. Не волнуйся, это решаемо.")
         except Exception as e:
-            st.error(f"Критический сбой: {e}")
+            st.error(f"Не удалось получить данные. Steam сбросил соединение.")
     else:
-        st.warning("Вставь ссылку, содержащую 17 цифр ID.")
+        st.warning("В ссылке должен быть 17-значный ID.")
 
 st.divider()
-st.caption("Используется технология CodeTabs для обхода сетевых ограничений.")
+st.caption("Разработка продолжается. Мы найдем способ обойти ограничения!")
