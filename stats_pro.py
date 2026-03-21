@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import re
+import json
 
 # Настройки
 st.set_page_config(page_title="CS2 Pro Analytics", page_icon="📈", layout="wide")
@@ -9,19 +10,12 @@ STEAM_API_KEY = "80562D785863D2DB396C004F7547514D"
 TELEGRAM_LINK = "https://t.me/CS2devLog"
 DONATE_LINK = "https://www.donationalerts.com/r/anter404"
 
-# Усиленная маскировка
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-    'Referer': 'https://steamcommunity.com/'
-}
-
 with st.sidebar:
     st.title("ANTer404 | Project")
     st.markdown(f"[📢 Наш Telegram]({TELEGRAM_LINK})")
     st.markdown(f"[💰 Поддержать проект]({DONATE_LINK})")
     st.divider()
-    st.caption("v1.1.7 | Анти-бан сборка")
+    st.caption("v1.1.8 | Обход блокировки")
 
 st.title("📈 CS2 Pro Analytics")
 
@@ -33,37 +27,43 @@ if user_input:
     
     if found_ids:
         steam_id = found_ids[0]
-        # ИСПОЛЬЗУЕМ HTTPS вместо HTTP
-        url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
+        # Прямая ссылка на API
+        api_url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
+        
+        # Ссылка через прокси-сервер (магия обхода 403 ошибки)
+        proxy_url = f"https://api.allorigins.win/get?url={requests.utils.quote(api_url)}"
         
         try:
-            # Пробуем сделать запрос
-            response = requests.get(url, headers=HEADERS, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                players = data.get('response', {}).get('players', [])
+            with st.spinner('Пробиваемся через защиту Steam...'):
+                response = requests.get(proxy_url, timeout=15)
                 
-                if players:
-                    player = players[0]
-                    col1, col2 = st.columns([1, 4])
-                    with col1:
-                        st.image(player['avatarfull'], width=150)
-                    with col2:
-                        st.header(player['personaname'])
-                        st.write(f"🆔 SteamID64: `{steam_id}`")
-                        st.write(f"🌐 [Профиль в Steam]({player['profileurl']})")
+                if response.status_code == 200:
+                    # Прокси возвращает JSON, в котором наши данные лежат в поле 'contents' в виде строки
+                    raw_data = response.json()
+                    steam_data = json.loads(raw_data['contents'])
+                    
+                    players = steam_data.get('response', {}).get('players', [])
+                    
+                    if players:
+                        player = players[0]
+                        col1, col2 = st.columns([1, 4])
+                        with col1:
+                            st.image(player['avatarfull'], width=150)
+                        with col2:
+                            st.header(player['personaname'])
+                            st.write(f"🆔 SteamID64: `{steam_id}`")
+                            st.write(f"🌐 [Профиль в Steam]({player['profileurl']})")
+                        
+                        st.success("Связь установлена!")
+                    else:
+                        st.warning("Steam ответил, но игрока не нашел. Проверь ID.")
                 else:
-                    st.warning("Steam не нашел игрока. Проверь настройки приватности своего профиля.")
-            else:
-                # Если всё еще 403, предлагаем решение
-                st.error(f"Ошибка {response.status_code}: Steam блокирует облачный сервер.")
-                st.info("💡 Попробуй подождать 5 минут или вставь ссылку еще раз. Мы работаем над обходом блокировки!")
-                
+                    st.error(f"Прокси-сервер временно недоступен (Код {response.status_code})")
+                    
         except Exception as e:
-            st.error(f"Связь оборвалась. Попробуй обновить страницу.")
+            st.error(f"Ошибка соединения: {e}")
     else:
         st.warning("В ссылке должен быть 17-значный ID.")
 
 st.divider()
-st.caption("Powered by Steam Web API")
+st.caption("Используется защищенный шлюз AllOrigins для обхода блокировок Steam.")
