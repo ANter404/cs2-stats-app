@@ -15,40 +15,28 @@ with st.sidebar:
     st.markdown(f"[📢 Наш Telegram]({TELEGRAM_LINK})")
     st.markdown(f"[💰 Поддержать проект]({DONATE_LINK})")
     st.divider()
-    st.caption("v1.1.3 | © 2026")
+    st.caption("v1.1.4 | С пылу с жару")
 
 st.title("📈 CS2 Pro Analytics")
 
-# Поле ввода (теперь максимально удобное)
-user_input = st.text_input("Вставь ссылку на Steam профиль или ID:", 
-                          placeholder="https://steamcommunity.com/id/anter404/")
+# Поле ввода
+user_input = st.text_input("Вставь ссылку на профиль:", 
+                          value="https://steamcommunity.com/profiles/76561198749701067/")
 
 if user_input:
-    steam_id = None
+    # Ищем 17 цифр в любом месте ссылки
+    found_ids = re.findall(r'\d{17}', user_input)
     
-    # Способ 1: Если ввели просто 17 цифр
-    if user_input.isdigit() and len(user_input) == 17:
-        steam_id = user_input
-    
-    # Способ 2: Если в ссылке уже есть цифры (profiles/7656...)
-    elif "profiles/" in user_input:
-        found = re.findall(r'\d{17}', user_input)
-        if found:
-            steam_id = found[0]
-            
-    # Способ 3: Если в ссылке ник (id/nickname)
-    elif "id/" in user_input:
-        vanity_url = user_input.split("id/")[1].strip("/")
-        res_id = requests.get(f"http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key={STEAM_API_KEY}&vanityurl={vanity_url}").json()
-        if res_id.get('response', {}).get('success') == 1:
-            steam_id = res_id['response']['steamid']
-
-    if steam_id:
+    if found_ids:
+        steam_id = found_ids[0]
+        
         # Получаем данные профиля
         url = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_KEY}&steamids={steam_id}"
+        
         try:
-            res = requests.get(url).json()
-            players = res.get('response', {}).get('players', [])
+            response = requests.get(url)
+            data = response.json()
+            players = data.get('response', {}).get('players', [])
             
             if players:
                 player = players[0]
@@ -57,18 +45,24 @@ if user_input:
                     st.image(player['avatarfull'], width=150)
                 with col2:
                     st.header(player['personaname'])
-                    st.write(f"🆔 SteamID64: `{steam_id}`")
-                    st.write(f"🔗 [Открыть профиль в Steam]({player['profileurl']})")
+                    st.write(f"🆔 Твой ID: `{steam_id}`")
+                    st.write(f"🌐 [Ссылка на профиль]({player['profileurl']})")
                 
                 st.divider()
                 st.subheader("📦 Инвентарь CS2")
-                st.info("🔄 Настраиваем парсинг предметов... Загляни в ТГ за новостями!")
+                # Кнопка для теста инвентаря
+                if st.button("Проверить предметы"):
+                    st.write("🔍 Запрашиваем список предметов у Steam...")
+                    # Ссылка на инвентарь в формате JSON (хитрый способ)
+                    inv_url = f"https://steamcommunity.com/inventory/{steam_id}/730/2?l=russian&count=75"
+                    st.info(f"Пытаюсь достучаться до инвентаря по адресу: {inv_url}")
+                    st.warning("Steam часто блокирует прямые запросы с серверов. Если ничего не появилось — значит, защиту еще не обошли.")
             else:
-                st.error("Steam вернул пустой профиль. Проверь настройки приватности.")
-        except:
-            st.error("Ошибка получения данных. Попробуй обновить страницу.")
+                st.error("Steam не вернул данные. Возможно, профиль скрыт.")
+        except Exception as e:
+            st.error(f"Техническая ошибка: {e}")
     else:
-        st.warning("Не удалось распознать ссылку. Попробуй скопировать её целиком из браузера.")
+        st.warning("Вставь корректную ссылку, содержащую 17 цифр ID.")
 
 st.divider()
 st.caption("Powered by Steam Web API")
