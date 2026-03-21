@@ -22,12 +22,13 @@ with st.sidebar:
     st.markdown(f"💰 [Донат (Деньги)]({DONATE_PAYPAL})")
     st.markdown(f"🎁 [Трейд (Скины)]({TRADE_LINK})")
     st.divider()
-    st.caption("v1.3.2 | Compact Inventory")
+    st.caption("v1.3.3 | Fixed UI")
 
 st.title("📈 CS2 Pro Analytics")
 
+# УБРАЛ value=, теперь ссылка сама не вставляется
 user_input = st.text_input("Вставь ссылку на профиль Steam:", 
-                          value="https://steamcommunity.com/profiles/76561198749701067/")
+                          placeholder="https://steamcommunity.com/profiles/76561198...")
 
 if user_input:
     found_ids = re.findall(r'\d{17}', user_input)
@@ -66,32 +67,32 @@ if user_input:
                     
                     if res_inv and 'descriptions' in res_inv:
                         items = res_inv['descriptions']
-                        # Делаем сетку по 6 предметов в ряд, чтобы было компактно
+                        # Делаем сетку по 6 колонок
                         cols = st.columns(6) 
                         
                         for idx, item in enumerate(items):
                             with cols[idx % 6]:
                                 img_hash = item.get('icon_url')
                                 if img_hash:
-                                    img_url = f"https://community.akamai.steamstatic.com/economy/image/{img_hash}/100fx100f"
-                                    st.image(img_url, use_container_width=True)
+                                    img_url = f"https://community.akamai.steamstatic.com/economy/image/{img_hash}/128fx128f"
+                                    # УБРАЛ use_container_width, картинка будет маленькой
+                                    st.image(img_url, width=100)
                                 
                                 name = item.get('market_name', 'Предмет')
                                 color = item.get('name_color', 'FFFFFF')
-                                st.markdown(f"<p style='color:#{color}; font-size: 11px; font-weight:bold; line-height: 1.1;'>{name}</p>", unsafe_allow_html=True)
+                                # Текст чуть увеличил, чтобы читался
+                                st.markdown(f"<p style='color:#{color}; font-size: 13px; font-weight:bold; line-height: 1.2;'>{name}</p>", unsafe_allow_html=True)
                                 
                                 if item.get('tradable') == 0:
-                                    st.markdown("<span style='color:#ff4b4b; font-size:9px;'>⏳ Lock</span>", unsafe_allow_html=True)
+                                    st.markdown("<span style='color:#ff4b4b; font-size:11px;'>⏳ Lock</span>", unsafe_allow_html=True)
                                 else:
-                                    st.markdown("<span style='color:#00ff00; font-size:9px;'>✅ Ready</span>", unsafe_allow_html=True)
+                                    st.markdown("<span style='color:#00ff00; font-size:11px;'>✅ Ready</span>", unsafe_allow_html=True)
                     else:
-                        st.info("Инвентарь пока не подтянулся. Попробуй обновить позже.")
+                        st.info("Инвентарь пока не подтянулся.")
                 else:
                     st.warning("Профиль не найден.")
         except:
-            st.error("Steam занят, обнови страницу через 10 секунд.")
-    else:
-        st.warning("Вставь ссылку с ID.")
+            st.error("Steam занят, попробуй позже.")
 
 st.divider()
 st.caption("ANTer404 Dev | 2026")
